@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 
 type Bindings = {
-  DB: D1Database;
+  signaling_db: D1Database;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -49,7 +49,7 @@ function timingSafeEqual(a: string, b: string): boolean {
 // Health and database readiness probe
 app.get("/healthz", async (c) => {
   try {
-    await c.env.DB.prepare("SELECT 1").run();
+    await c.env.signaling_db.prepare("SELECT 1").run();
     return c.json({
       status: "ok",
       service: "signaling-server",
@@ -111,9 +111,8 @@ app.put("/v1/channels/:id", async (c) => {
   const secretHash = providedSecret ? await sha256(providedSecret) : null;
 
   // Check existing channel secret
-  const existing = await c.env.DB.prepare(
-    `SELECT secret_hash FROM channels WHERE id = ? AND expires_at > ?`
-  )
+  const existing = await c.env.signaling_db
+    .prepare(`SELECT secret_hash FROM channels WHERE id = ? AND expires_at > ?`)
     .bind(id, now)
     .first<{ secret_hash: string | null }>();
 
@@ -131,7 +130,9 @@ app.put("/v1/channels/:id", async (c) => {
 
   const etag = `"${await sha256(body)}"`;
 
-  await c.env.DB.prepare(`
+  await c.env.signaling_db
+    .prepare(
+      `
     INSERT INTO channels (id, data, secret_hash, etag, updated_at, expires_at)
     VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
@@ -140,7 +141,8 @@ app.put("/v1/channels/:id", async (c) => {
       etag = excluded.etag,
       updated_at = excluded.updated_at,
       expires_at = excluded.expires_at
-  `)
+  `
+    )
     .bind(id, body, secretHash, etag, now, expiresAt)
     .run();
 
@@ -161,9 +163,10 @@ app.get("/v1/channels/:id", async (c) => {
   }
 
   const now = Date.now();
-  const row = await c.env.DB.prepare(
-    `SELECT data, etag, updated_at, expires_at FROM channels WHERE id = ? AND expires_at > ?`
-  )
+  const row = await c.env.signaling_db
+    .prepare(
+      `SELECT data, etag, updated_at, expires_at FROM channels WHERE id = ? AND expires_at > ?`
+    )
     .bind(id, now)
     .first<{ data: string; etag: string; updated_at: number; expires_at: number }>();
 
@@ -198,9 +201,8 @@ app.delete("/v1/channels/:id", async (c) => {
     c.req.header("Authorization")?.replace(/^Bearer\s+/i, "");
   const secretHash = providedSecret ? await sha256(providedSecret) : null;
 
-  const existing = await c.env.DB.prepare(
-    `SELECT secret_hash FROM channels WHERE id = ?`
-  )
+  const existing = await c.env.signaling_db
+    .prepare(`SELECT secret_hash FROM channels WHERE id = ?`)
     .bind(id)
     .first<{ secret_hash: string | null }>();
 
@@ -214,7 +216,7 @@ app.delete("/v1/channels/:id", async (c) => {
     }
   }
 
-  await c.env.DB.prepare(`DELETE FROM channels WHERE id = ?`).bind(id).run();
+  await c.env.signaling_db.prepare(`DELETE FROM channels WHERE id = ?`).bind(id).run();
   return c.json({ ok: true, deleted: true });
 });
 
@@ -223,6 +225,6 @@ export default {
   fetch: app.fetch,
   async scheduled(event: { scheduledTime: number; cron: string }, env: Bindings) {
     const now = Date.now();
-    await env.DB.prepare(`DELETE FROM channels WHERE expires_at <= ?`).bind(now).run();
+    await env.signaling_db.prepare(`DELETE FROM channels WHERE expires_at <= ?`).bind(now).run();
   },
 };

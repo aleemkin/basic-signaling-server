@@ -9,12 +9,14 @@
 	"upload_source_maps": true,
 	"d1_databases": [
 		{
-			"binding": "DB",
+			"binding": "signaling_db",
 			"database_name": "signaling-db",
-			"database_id": "REPLACE_WITH_YOUR_DATABASE_ID"
+			"database_id": "9bb7332c-3eaf-4371-aeb3-b35360d293b1"
 		}
 	],
 	"triggers": {
-		"crons": ["0 0 * * *"]
+		"crons": [
+			"0 0 * * *"
+		]
 	}
 }
