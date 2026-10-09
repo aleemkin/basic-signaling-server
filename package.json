@@ -1,16 +1,24 @@
 {
   "name": "signaling-server",
+  "version": "1.0.0",
   "type": "module",
+  "private": true,
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy --minify",
+    "typecheck": "tsc --noEmit",
+    "db:create": "wrangler d1 create signaling-db",
+    "db:migrate": "wrangler d1 execute signaling-db --remote --file=./schema.sql",
+    "db:migrate:local": "wrangler d1 execute signaling-db --local --file=./schema.sql",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings"
   },
   "dependencies": {
     "hono": "^4.13.13"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261006.1",
     "@types/node": "^26.6.4",
+    "typescript": "^5.5.0",
     "wrangler": "^4.149.0"
   }
 }
